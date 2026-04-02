@@ -14,5 +14,7 @@
         "build.zig.zon",
         "README.org",
         "LICENSE",
+        "include",
+        "benchmark",
     },
 }
