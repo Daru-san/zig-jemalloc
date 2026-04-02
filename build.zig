@@ -12,6 +12,11 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const link_vendor = b.option(bool, "link_vendor", "Whether link to vendored jemalloc (default: true)") orelse true;
+    const override_libc_malloc = b.option(
+        bool,
+        "override_libc_malloc",
+        "Whether to override the libc implementation of malloc with jemalloc",
+    ) orelse false;
 
     const module = b.addModule("jemalloc", .{
         .root_source_file = b.path("src/root.zig"),
@@ -24,7 +29,7 @@ pub fn build(b: *std.Build) !void {
         .root_module = module,
     });
     if (link_vendor) {
-        if (try buildStaticLib(b, target, optimize)) |lib| {
+        if (try buildStaticLib(b, target, optimize, override_libc_malloc)) |lib| {
             module.linkLibrary(lib);
         } else {
             return;
@@ -42,7 +47,12 @@ pub fn build(b: *std.Build) !void {
     try buildBenchmark(b, "list", target, optimize, module);
 }
 
-fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !?*std.Build.Step.Compile {
+fn buildStaticLib(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    override_libc_malloc: bool,
+) !?*std.Build.Step.Compile {
     const dep = b.lazyDependency("jemalloc", .{
         .target = target,
         .optimize = optimize,
@@ -117,7 +127,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
             .JEMALLOC_USABLE_SIZE_CONST = .@"const",
             .LG_SIZEOF_PTR = 3,
             .JEMALLOC_HAVE_ATTR_FORMAT_GNU_PRINTF = null,
-            .JEMALLOC_OVERRIDE_MEMALIGN = null,
+            .JEMALLOC_OVERRIDE_MEMALIGN = if (override_libc_malloc) {} else null,
             .JEMALLOC_USE_CXX_THROW = null,
         },
     );
@@ -146,8 +156,8 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
             .include_path = "jemalloc/jemalloc_protos.h",
         },
         .{
-            .install_suffix = .je_,
-            .je_ = .je_,
+            .install_suffix = if (override_libc_malloc) "" else "je_",
+            .je_ = if (override_libc_malloc) "" else "je_",
         },
     );
     module.addConfigHeader(protos_header);
@@ -167,15 +177,15 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
                 .style = .{ .autoconf_undef = dep.path("include/jemalloc/internal/jemalloc_internal_defs.h.in") },
             },
             .{
-                .JEMALLOC_PREFIX = "je_",
-                .JEMALLOC_CPREFIX = "JE_",
-                .JEMALLOC_OVERRIDE___LIBC_CALLOC = null,
-                .JEMALLOC_OVERRIDE___LIBC_FREE = null,
-                .JEMALLOC_OVERRIDE___LIBC_MALLOC = null,
-                .JEMALLOC_OVERRIDE___LIBC_MEMALIGN = null,
-                .JEMALLOC_OVERRIDE___LIBC_REALLOC = null,
-                .JEMALLOC_OVERRIDE___LIBC_VALLOC = null,
-                .JEMALLOC_OVERRIDE___POSIX_MEMALIGN = null,
+                .JEMALLOC_PREFIX = if (override_libc_malloc) "" else "je_",
+                .JEMALLOC_CPREFIX = if (override_libc_malloc) "" else "JE_",
+                .JEMALLOC_OVERRIDE___LIBC_CALLOC = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___LIBC_FREE = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___LIBC_MALLOC = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___LIBC_MEMALIGN = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___LIBC_REALLOC = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___LIBC_VALLOC = if (override_libc_malloc) {} else null,
+                .JEMALLOC_OVERRIDE___POSIX_MEMALIGN = if (override_libc_malloc) {} else null,
                 .JEMALLOC_PRIVATE_NAMESPACE = .je_,
                 .HAVE_CPU_SPINWAIT = 1,
                 .LG_VADDR = 48,
@@ -266,7 +276,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
                 .JEMALLOC_BACKGROUND_THREAD = if (is_linux) {} else null,
                 .JEMALLOC_EXPORT = null,
                 .JEMALLOC_CONFIG_MALLOC_CONF = "",
-                .JEMALLOC_IS_MALLOC = null,
+                .JEMALLOC_IS_MALLOC = if (override_libc_malloc) {} else null,
                 .JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE = target.result.isGnuLibC(),
                 .JEMALLOC_OPT_SAFETY_CHECKS = null,
                 .JEMALLOC_ENABLE_CXX = null,
