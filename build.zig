@@ -156,8 +156,8 @@ fn buildStaticLib(
             .include_path = "jemalloc/jemalloc_protos.h",
         },
         .{
-            .install_suffix = if (override_libc_malloc) "" else "je_",
-            .je_ = if (override_libc_malloc) "" else "je_",
+            .install_suffix = .je_,
+            .je_ = .je_,
         },
     );
     module.addConfigHeader(protos_header);
@@ -177,8 +177,8 @@ fn buildStaticLib(
                 .style = .{ .autoconf_undef = dep.path("include/jemalloc/internal/jemalloc_internal_defs.h.in") },
             },
             .{
-                .JEMALLOC_PREFIX = if (override_libc_malloc) "" else "je_",
-                .JEMALLOC_CPREFIX = if (override_libc_malloc) "" else "JE_",
+                .JEMALLOC_PREFIX = "je_",
+                .JEMALLOC_CPREFIX = "JE_",
                 .JEMALLOC_OVERRIDE___LIBC_CALLOC = if (override_libc_malloc) {} else null,
                 .JEMALLOC_OVERRIDE___LIBC_FREE = if (override_libc_malloc) {} else null,
                 .JEMALLOC_OVERRIDE___LIBC_MALLOC = if (override_libc_malloc) {} else null,
