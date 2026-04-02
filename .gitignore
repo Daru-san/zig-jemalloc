@@ -5,3 +5,5 @@ libs/jemalloc/configure~
 libs/jemalloc/confdefs.h
 libs/jemalloc/conftest.c
 libs/jemalloc/conftest.err
+result
+.direnv
