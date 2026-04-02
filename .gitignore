@@ -1,6 +1,7 @@
 zig-cache/
 .zig-cache/
 zig-out/
+zig-pkg/
 libs/jemalloc/configure~
 libs/jemalloc/confdefs.h
 libs/jemalloc/conftest.c
