@@ -12,6 +12,7 @@ pub const allocator = std.mem.Allocator{
         .alloc = alloc,
         .resize = resize,
         .free = free,
+        .remap = remap,
     },
 };
 
@@ -20,8 +21,8 @@ pub const allocator = std.mem.Allocator{
 pub fn collectMallocStats(wtr: anytype, opts: ?[:0]const u8) void {
     const context = @constCast(&wtr);
     c.je_malloc_stats_print(struct {
-        fn cb(ctx: ?*anyopaque, msg: [*c]const u8) callconv(.C) void {
-            const p: *@TypeOf(wtr) = @alignCast(@ptrCast(ctx));
+        fn cb(ctx: ?*anyopaque, msg: [*c]const u8) callconv(.c) void {
+            const p: *@TypeOf(wtr) = @ptrCast(@alignCast(ctx));
             p.writeAll(std.mem.span(msg)) catch |e| {
                 std.log.err("call malloc_stats_print cb failed, err:{any}", .{e});
             };
@@ -29,10 +30,10 @@ pub fn collectMallocStats(wtr: anytype, opts: ?[:0]const u8) void {
     }.cb, context, if (opts) |v| v else null);
 }
 
-fn alloc(_: *anyopaque, n: usize, log2_align: u8, return_address: usize) ?[*]u8 {
+fn alloc(_: *anyopaque, n: usize, align_: std.mem.Alignment, return_address: usize) ?[*]u8 {
     _ = return_address;
 
-    const alignment = @as(usize, 1) << @as(Allocator.Log2Align, @intCast(log2_align));
+    const alignment = @as(usize, 1) << @as(Allocator.Log2Align, @intCast(align_.toByteUnits()));
     const ptr = c.je_aligned_alloc(alignment, n) orelse return null;
     return @ptrCast(ptr);
 }
@@ -40,7 +41,7 @@ fn alloc(_: *anyopaque, n: usize, log2_align: u8, return_address: usize) ?[*]u8 
 fn resize(
     _: *anyopaque,
     buf_unaligned: []u8,
-    log2_buf_align: u8,
+    log2_buf_align: std.mem.Alignment,
     new_size: usize,
     return_address: usize,
 ) bool {
@@ -49,19 +50,26 @@ fn resize(
     return c.je_malloc_usable_size(buf_unaligned.ptr) >= new_size;
 }
 
-fn free(_: *anyopaque, slice: []u8, log2_buf_align: u8, return_address: usize) void {
+fn free(_: *anyopaque, slice: []u8, log2_buf_align: std.mem.Alignment, return_address: usize) void {
     _ = log2_buf_align;
     _ = return_address;
     c.je_free(slice.ptr);
+}
+
+fn remap(_: *anyopaque, slice: []u8, log2_buf_align: std.mem.Alignment, _: usize, return_address: usize) ?[*]u8 {
+    _ = slice;
+    _ = log2_buf_align;
+    _ = return_address;
+    return null;
 }
 
 test "basic alloc" {
     const ptr = try allocator.create(struct { a: i8, b: u64 });
     allocator.destroy(ptr);
 
-    var buf = std.ArrayList(u8).init(std.testing.allocator);
-    defer buf.deinit();
-    const wtr = buf.writer();
+    var buf = std.ArrayList(u8).empty;
+    defer buf.deinit(std.testing.allocator);
+    const wtr = std.Io.Writer.fixed(buf.items);
     collectMallocStats(wtr, "J");
 
     const Stats = struct {
@@ -97,11 +105,11 @@ test "basic alloc" {
 }
 
 test "alloc ArrayList" {
-    var lst = std.ArrayList(usize).init(allocator);
-    defer lst.deinit();
+    var lst = std.ArrayList(usize).empty;
+    defer lst.deinit(std.testing.allocator);
 
     for (0..100_000) |i| {
-        try lst.append(i);
+        try lst.append(std.testing.allocator, i);
     }
 }
 

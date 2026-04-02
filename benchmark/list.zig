@@ -6,15 +6,17 @@ const Allocator = std.mem.Allocator;
 
 const MAX: usize = 1_000_000_000 / 4;
 
-fn run(loop_count: usize, name: []const u8, allocator: Allocator) !void {
-    var lst = ArrayList(usize).init(allocator);
-    const start = std.time.nanoTimestamp();
+fn run(loop_count: usize, name: []const u8, allocator: Allocator, io: std.Io) !void {
+    var lst = ArrayList(usize).empty;
+    defer lst.deinit(allocator);
+
+    const start = std.Io.Timestamp.now(io, .awake).toNanoseconds();
     var s: usize = 0;
     for (0..loop_count) |i| {
-        try lst.append(i);
+        try lst.append(allocator, i);
         s += lst.items[lst.items.len - 1];
     }
-    const end = std.time.nanoTimestamp();
+    const end = std.Io.Timestamp.now(io, .awake).toNanoseconds();
 
     std.debug.print("{s} {}, cost: {d}ms\n", .{
         name,
@@ -23,12 +25,9 @@ fn run(loop_count: usize, name: []const u8, allocator: Allocator) !void {
     });
 }
 
-pub fn main() !void {
-    try run(MAX, "heap", std.heap.page_allocator);
-    try run(MAX, "jemalloc", jemalloc.allocator);
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() != .ok) @panic("leak");
-    const allocator = gpa.allocator();
-    try run(MAX, "GPA", allocator);
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    try run(MAX, "heap", std.heap.page_allocator, io);
+    try run(MAX, "jemalloc", jemalloc.allocator, io);
+    try run(MAX, "GPA", init.gpa, io);
 }

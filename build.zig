@@ -21,15 +21,11 @@ pub fn build(b: *std.Build) !void {
     });
     const lib_ut = b.addTest(.{
         .name = "jemalloc-tests",
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
+        .root_module = module,
     });
     if (link_vendor) {
         if (try buildStaticLib(b, target, optimize)) |lib| {
             module.linkLibrary(lib);
-            lib_ut.linkLibrary(lib);
         } else {
             return;
         }
@@ -51,19 +47,27 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         .target = target,
         .optimize = optimize,
     }) orelse return null;
-    const lib = b.addStaticLibrary(.{
-        .name = "jemalloc",
+
+    const module = b.createModule(.{
+        .link_libc = true,
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
+    });
+    const lib = b.addLibrary(.{
+        .name = "jemalloc",
+        .linkage = .static,
+        .root_module = module,
     });
     // sanitize will cause Illegal instruction when call je_realloc, so disable it now.
-    lib.root_module.sanitize_c = false;
+    lib.root_module.sanitize_c = .full;
 
-    const is_darwin = target.result.isDarwin();
+    const is_darwin = target.result.isDarwinLibC();
     const is_linux = isLinux(target.result);
 
-    const dir = try std.fs.cwd().openDir(dep.path("src").getPath(b), .{ .iterate = true });
+    var threaded = std.Io.Threaded.init(b.allocator, .{});
+    const io = threaded.io();
+
+    const dir = try std.Io.Dir.cwd().openDir(io, dep.path("src").getPath(b), .{ .iterate = true });
     var iter = dir.iterate();
     const cflags = &.{
         "-Werror=unknown-warning-option",
@@ -80,7 +84,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         "-Wimplicit-fallthrough",
         "-funroll-loops",
     };
-    while (try iter.next()) |entry| {
+    while (try iter.next(io)) |entry| {
         if (entry.kind != .file) {
             continue;
         }
@@ -90,15 +94,16 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
                 continue;
             }
             const path = try std.fmt.allocPrint(b.allocator, "src/{s}", .{entry.name});
-            lib.addCSourceFile(.{
+            module.addCSourceFile(.{
                 .file = dep.path(path),
                 .flags = cflags,
             });
         }
     }
+
     const defs_header = b.addConfigHeader(
         .{
-            .style = .{ .autoconf = dep.path("include/jemalloc/jemalloc_defs.h.in") },
+            .style = .{ .autoconf_undef = dep.path("include/jemalloc/jemalloc_defs.h.in") },
             .include_path = "jemalloc/jemalloc_defs.h",
         },
         .{
@@ -116,7 +121,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
             .JEMALLOC_USE_CXX_THROW = null,
         },
     );
-    lib.addConfigHeader(defs_header);
+    module.addConfigHeader(defs_header);
 
     const macros_header = b.addConfigHeader(
         .{
@@ -133,7 +138,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
             .jemalloc_version_gid_ident = .missing,
         },
     );
-    lib.addConfigHeader(macros_header);
+    module.addConfigHeader(macros_header);
 
     const protos_header = b.addConfigHeader(
         .{
@@ -145,7 +150,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
             .je_ = .je_,
         },
     );
-    lib.addConfigHeader(protos_header);
+    module.addConfigHeader(protos_header);
 
     const typedefs_header = b.addConfigHeader(
         .{
@@ -154,12 +159,12 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         },
         .{},
     );
-    lib.addConfigHeader(typedefs_header);
+    module.addConfigHeader(typedefs_header);
 
     {
         var header = b.addConfigHeader(
             .{
-                .style = .{ .autoconf = dep.path("include/jemalloc/internal/jemalloc_internal_defs.h.in") },
+                .style = .{ .autoconf_undef = dep.path("include/jemalloc/internal/jemalloc_internal_defs.h.in") },
             },
             .{
                 .JEMALLOC_PREFIX = "je_",
@@ -262,7 +267,7 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
                 .JEMALLOC_EXPORT = null,
                 .JEMALLOC_CONFIG_MALLOC_CONF = "",
                 .JEMALLOC_IS_MALLOC = null,
-                .JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE = target.result.isGnu(),
+                .JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE = target.result.isGnuLibC(),
                 .JEMALLOC_OPT_SAFETY_CHECKS = null,
                 .JEMALLOC_ENABLE_CXX = null,
                 .JEMALLOC_OPT_SIZE_CHECKS = null,
@@ -275,26 +280,26 @@ fn buildStaticLib(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
         if (target.result.cpu.arch.isX86()) {
             try header.values.put("CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"pause\")" });
             try header.values.put("HAVE_CPU_SPINWAIT", .{ .int = 1 });
-        } else if (target.result.cpu.arch.isARM() or target.result.cpu.arch.isAARCH64()) {
+        } else if (target.result.cpu.arch.isArm() or target.result.cpu.arch.isAARCH64()) {
             try header.values.put("CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"isb\")" });
             try header.values.put("HAVE_CPU_SPINWAIT", .{ .int = 1 });
         } else {
             try header.values.put("CPU_SPINWAIT", .undef);
             try header.values.put("HAVE_CPU_SPINWAIT", .undef);
         }
-        lib.addConfigHeader(header);
+        module.addConfigHeader(header);
     }
     if (is_linux) {
-        lib.defineCMacro("_GNU_SOURCE", null);
+        module.addCMacro("_GNU_SOURCE", "null");
     }
-    lib.defineCMacro("_GNUC_", null);
-    lib.addIncludePath(b.path("include"));
-    lib.addIncludePath(dep.path("include"));
+    module.addCMacro("_GNUC_", "null");
+    module.addIncludePath(b.path("include"));
+    module.addIncludePath(dep.path("include"));
     lib.installHeader(b.path("include/jemalloc/jemalloc.h"), "jemalloc/jemalloc.h");
-    lib.installHeader(typedefs_header.getOutput(), "jemalloc/jemalloc_typedefs.h");
-    lib.installHeader(protos_header.getOutput(), "jemalloc/jemalloc_protos.h");
-    lib.installHeader(macros_header.getOutput(), "jemalloc/jemalloc_macros.h");
-    lib.installHeader(defs_header.getOutput(), "jemalloc/jemalloc_defs.h");
+    lib.installHeader(typedefs_header.getOutputFile(), "jemalloc/jemalloc_typedefs.h");
+    lib.installHeader(protos_header.getOutputFile(), "jemalloc/jemalloc_protos.h");
+    lib.installHeader(macros_header.getOutputFile(), "jemalloc/jemalloc_macros.h");
+    lib.installHeader(defs_header.getOutputFile(), "jemalloc/jemalloc_defs.h");
 
     return lib;
 }
@@ -308,9 +313,11 @@ fn buildBenchmark(
 ) !void {
     const exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = b.path("benchmark/" ++ name ++ ".zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benchmark/" ++ name ++ ".zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     exe.root_module.addImport("jemalloc", jemalloc_module);
     b.installArtifact(exe);

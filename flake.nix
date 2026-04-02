@@ -23,7 +23,6 @@
       perSystem =
         {
           pkgs,
-          lib,
           system,
           ...
         }:
@@ -41,13 +40,13 @@
             buildInputs =
               (with pkgs; [
                 pkg-config
-                jemalloc
+                autoconf
+                gnumake
               ])
               ++ (with pkgs.zigpkgs; [
                 master
                 zls
               ]);
-            LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.jemalloc ];
           };
         };
     };
