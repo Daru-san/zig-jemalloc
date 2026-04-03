@@ -69,7 +69,7 @@ fn buildStaticLib(
         .root_module = module,
     });
     // sanitize will cause Illegal instruction when call je_realloc, so disable it now.
-    lib.root_module.sanitize_c = .full;
+    lib.root_module.sanitize_c = .off;
 
     const is_darwin = target.result.isDarwinLibC();
     const is_linux = isLinux(target.result);
