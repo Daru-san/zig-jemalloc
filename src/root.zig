@@ -52,7 +52,7 @@ fn resize(
 
 fn free(_: *anyopaque, slice: []u8, align_: std.mem.Alignment, return_address: usize) void {
     _ = return_address;
-    c.je_sdallocx(slice.ptr, slice.len, c.MALLOCX_ALIGN(align_.toByteUnits()));
+    c.je_dallocx(slice.ptr, c.MALLOCX_ALIGN(align_.toByteUnits()));
 }
 
 fn remap(
