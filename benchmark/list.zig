@@ -27,7 +27,7 @@ fn run(loop_count: usize, name: []const u8, allocator: Allocator, io: std.Io) !v
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
-    try run(MAX, "heap", std.heap.page_allocator, io);
+    try run(MAX, "heap", std.heap.smp_allocator, io);
     try run(MAX, "jemalloc", jemalloc.allocator, io);
     try run(MAX, "GPA", init.gpa, io);
 }
