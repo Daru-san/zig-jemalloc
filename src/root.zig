@@ -33,34 +33,38 @@ pub fn collectMallocStats(wtr: anytype, opts: ?[:0]const u8) void {
 fn alloc(_: *anyopaque, n: usize, align_: std.mem.Alignment, return_address: usize) ?[*]u8 {
     _ = return_address;
 
-    const alignment = @as(usize, 1) << @as(Allocator.Log2Align, @intCast(align_.toByteUnits()));
-    const ptr = c.je_aligned_alloc(alignment, n) orelse return null;
+    const alignment = align_.toByteUnits();
+    const ptr = c.je_mallocx(n, c.MALLOCX_ALIGN(alignment)) orelse return null;
     return @ptrCast(ptr);
 }
 
 fn resize(
     _: *anyopaque,
     buf_unaligned: []u8,
-    log2_buf_align: std.mem.Alignment,
+    align_: std.mem.Alignment,
     new_size: usize,
     return_address: usize,
 ) bool {
-    _ = log2_buf_align;
+    _ = align_;
     _ = return_address;
     return c.je_malloc_usable_size(buf_unaligned.ptr) >= new_size;
 }
 
-fn free(_: *anyopaque, slice: []u8, log2_buf_align: std.mem.Alignment, return_address: usize) void {
-    _ = log2_buf_align;
+fn free(_: *anyopaque, slice: []u8, align_: std.mem.Alignment, return_address: usize) void {
     _ = return_address;
-    c.je_free(slice.ptr);
+    c.je_sdallocx(slice.ptr, slice.len, c.MALLOCX_ALIGN(align_.toByteUnits()));
 }
 
-fn remap(_: *anyopaque, slice: []u8, log2_buf_align: std.mem.Alignment, _: usize, return_address: usize) ?[*]u8 {
-    _ = slice;
-    _ = log2_buf_align;
+fn remap(
+    _: *anyopaque,
+    slice: []u8,
+    align_: std.mem.Alignment,
+    new_size: usize,
+    return_address: usize,
+) ?[*]u8 {
     _ = return_address;
-    return null;
+    const ptr = c.je_rallocx(slice.ptr, new_size, c.MALLOCX_ALIGN(align_.toByteUnits()));
+    return @ptrCast(ptr);
 }
 
 test "basic alloc" {
