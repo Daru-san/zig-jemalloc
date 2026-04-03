@@ -69,6 +69,8 @@ fn remap(
 
 test "basic alloc" {
     const ptr = try allocator.create(struct { a: i8, b: u64 });
+    ptr.* = .{ .a = 12, .b = 32 };
+    try std.testing.expect(ptr.a == 12);
     allocator.destroy(ptr);
 
     var buf = std.ArrayList(u8).empty;
@@ -112,10 +114,10 @@ test "basic alloc" {
 
 test "alloc ArrayList" {
     var lst = std.ArrayList(usize).empty;
-    defer lst.deinit(std.testing.allocator);
+    defer lst.deinit(allocator);
 
     for (0..100_000) |i| {
-        try lst.append(std.testing.allocator, i);
+        try lst.append(allocator, i);
     }
 }
 
