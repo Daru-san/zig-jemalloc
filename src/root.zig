@@ -68,8 +68,10 @@ test "basic alloc" {
     allocator.destroy(ptr);
 
     var buf = std.ArrayList(u8).empty;
-    defer buf.deinit(std.testing.allocator);
-    const wtr = std.Io.Writer.fixed(buf.items);
+    defer buf.deinit(allocator);
+    const alloc_wtr = std.Io.Writer.Allocating.fromArrayList(allocator, &buf);
+    const wtr = alloc_wtr.writer;
+
     collectMallocStats(wtr, "J");
 
     const Stats = struct {
