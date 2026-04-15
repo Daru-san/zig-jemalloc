@@ -311,14 +311,14 @@ fn buildStaticLib(
         );
 
         if (target.result.cpu.arch.isX86()) {
-            try header.values.put("CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"pause\")" });
-            try header.values.put("HAVE_CPU_SPINWAIT", .{ .int = 1 });
+            try header.values.put(b.allocator, "CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"pause\")" });
+            try header.values.put(b.allocator, "HAVE_CPU_SPINWAIT", .{ .int = 1 });
         } else if (target.result.cpu.arch.isArm() or target.result.cpu.arch.isAARCH64()) {
-            try header.values.put("CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"isb\")" });
-            try header.values.put("HAVE_CPU_SPINWAIT", .{ .int = 1 });
+            try header.values.put(b.allocator, "CPU_SPINWAIT", .{ .ident = "__asm__ volatile(\"isb\")" });
+            try header.values.put(b.allocator, "HAVE_CPU_SPINWAIT", .{ .int = 1 });
         } else {
-            try header.values.put("CPU_SPINWAIT", .undef);
-            try header.values.put("HAVE_CPU_SPINWAIT", .undef);
+            try header.values.put(b.allocator, "CPU_SPINWAIT", .undef);
+            try header.values.put(b.allocator, "HAVE_CPU_SPINWAIT", .undef);
         }
         module.addConfigHeader(header);
     }
