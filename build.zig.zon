@@ -4,8 +4,8 @@
     .fingerprint = 0x8e9f36d471456021,
     .dependencies = .{
         .jemalloc = .{
-            .url = "https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz",
-            .hash = "N-V-__8AAI6tNAABjQW0BdMK_6FLfoduBdyNfEBIBlNgeuYL",
+            .url = "https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.1.tar.gz",
+            .hash = "N-V-__8AAIduQAAdVIl7gSIqQpIIehlhljtWu9xdFmXlt9oY",
         },
     },
     .paths = .{
