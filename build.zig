@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Translator = @import("translate_c").Translator;
+
 fn isLinux(target: std.Target) bool {
     return target.os.tag == .linux;
 }
@@ -28,15 +30,28 @@ pub fn build(b: *std.Build) !void {
         .name = "jemalloc-tests",
         .root_module = module,
     });
+
+    const translate_c = b.dependency("translate_c", .{});
+
+    const translator: Translator = .init(translate_c, .{
+        .c_source_file = b.path("include/jemalloc/jemalloc.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     if (link_vendor) {
         if (try buildStaticLib(b, target, optimize, override_libc_malloc)) |lib| {
+            translator.linkLibrary(lib);
             module.linkLibrary(lib);
         } else {
             return;
         }
     } else {
         module.linkSystemLibrary("jemalloc", .{});
+        translator.mod.linkSystemLibrary("jemalloc", .{});
     }
+
+    module.addImport("jemalloc", translator.mod);
 
     b.installArtifact(lib_ut);
 
@@ -73,7 +88,6 @@ fn buildStaticLib(
 
     const is_darwin = target.result.isDarwinLibC();
     const is_linux = isLinux(target.result);
-
     var threaded = std.Io.Threaded.init(b.allocator, .{});
     const io = threaded.io();
 

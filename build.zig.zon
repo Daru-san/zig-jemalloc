@@ -7,6 +7,10 @@
             .url = "https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz",
             .hash = "N-V-__8AAI6tNAABjQW0BdMK_6FLfoduBdyNfEBIBlNgeuYL",
         },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=2.0.1#4f5ad374e50d1a98d3da79fa5d3bda9949103bf7",
+            .hash = "translate_c-2.0.1-Q_BUWmpOBwCIhy--up1q6cl3OlIQE86iJU8R-bZ01aPj",
+        },
     },
     .paths = .{
         "src",

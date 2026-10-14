@@ -1,8 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const c = @cImport({
-    @cInclude("jemalloc/jemalloc.h");
-});
+
+const c = @import("jemalloc");
 
 /// An allocator based on [jemalloc](https://jemalloc.net/jemalloc.3.html)
 pub const allocator = std.mem.Allocator{
