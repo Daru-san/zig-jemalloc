@@ -91,7 +91,7 @@ fn buildStaticLib(
     var threaded = std.Io.Threaded.init(b.allocator, .{});
     const io = threaded.io();
 
-    const dir = try std.Io.Dir.cwd().openDir(io, dep.path("src").getPath(b), .{ .iterate = true });
+    const dir = try dep.builder.root.openDir(io, "src", .{ .iterate = true });
     var iter = dir.iterate();
     const cflags = &.{
         "-Werror=unknown-warning-option",
