@@ -25,7 +25,7 @@
             buildInputs = with pkgs; [
               pkg-config
               autoconf
-              zig
+              zig_0_17
               zls
               gnumake
             ];
